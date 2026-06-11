@@ -1,5 +1,6 @@
 import socket
-from protocol import parse_command, encode_simple, encode_error
+from protocol import parse_command
+from commands import handle_command
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -18,10 +19,6 @@ while True:
             break
         command = parse_command(data)
         print(f"Parsed command: {command}")
-
-        if command[0].upper() == "PING":
-            conn.send(encode_simple("PONG"))
-        else:
-            conn.send(encode_error(f"ERR unknown command '{command[0]}'"))
+        conn.send(handle_command(command))
 
     print(f"Client disconnected: {addr}")
