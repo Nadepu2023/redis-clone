@@ -1,36 +1,25 @@
-import socket
-import threading
+import asyncio
 from protocol import parse_command
-from commands import handle_command, store_lock
+from commands import handle_command
 
-def handle_client(conn, addr):
+async def handle_client(reader, writer):
+    addr = writer.get_extra_info("peername")
     print(f"Client connected: {addr}")
     while True:
-        data = conn.recv(1024)
+        data = await reader.read(1024)      # PAUSE here until bytes arrive
         if not data:
             break
         command = parse_command(data)
         print(f"{addr} -> {command}")
-        with store_lock:
-            reply = handle_command(command)
-        conn.send(reply)
-    conn.close()
+        writer.write(handle_command(command))
+        await writer.drain()                # PAUSE until the reply is sent
+    writer.close()
     print(f"Client disconnected: {addr}")
 
-def main():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("127.0.0.1", 6379))
-    server.listen()
+async def main():
+    server = await asyncio.start_server(handle_client, "127.0.0.1", 6379)
     print("Listening on port 6379...")
+    async with server:
+        await server.serve_forever()
 
-    while True:                                  # forever:
-        conn, addr = server.accept()             #   wait for the next client
-        thread = threading.Thread(
-            target=handle_client,                #   give them a personal waiter
-            args=(conn, addr),
-            daemon=True,                         #   don't block shutdown
-        )
-        thread.start()                           #   and immediately go wait again
-
-main()
+asyncio.run(main())
