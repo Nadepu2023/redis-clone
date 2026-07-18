@@ -1,7 +1,9 @@
 from protocol import encode_simple, encode_error, encode_int, encode_bulk
 import threading
+import time
 
 store = {}
+expiries = {} 
 store_lock = threading.Lock()
 
 def handle_command(cmd: list[str]) -> bytes:
@@ -19,6 +21,7 @@ def handle_command(cmd: list[str]) -> bytes:
     elif name == "GET":
         if len(cmd) != 2:
             return encode_error("ERR wrong number of arguments for 'get'")
+        check_expired(cmd[1])
         return encode_bulk(store.get(cmd[1]))   # None -> $-1 nil, handled by your encoder
 
     elif name == "DEL":
@@ -44,6 +47,35 @@ def handle_command(cmd: list[str]) -> bytes:
             return encode_error("ERR value is not an integer or out of range")
         store[key] = str(new_value)          
         return encode_int(new_value)
+    
+    elif name == "EXPIRE":
+        if len(cmd) != 3:
+            return encode_error("ERR wrong number of arguments for 'expire'")
+        key = cmd[1]
+        if key not in store:
+            return encode_int(0)
+        seconds = int(cmd[2])
+        expiries[key] = time.time() + seconds
+        return encode_int(1)
+    
+    elif name == "TTL":
+        if len(cmd) != 2:
+            return encode_error("ERR wrong number of arguments for 'ttl'")
+        key = cmd[1]
+        if key not in store:
+            return encode_int(-2)               
+        if key not in expiries:
+            return encode_int(-1)                 
+        remaining = expiries[key] - time.time()
+        return encode_int(int(remaining))
 
     else:
         return encode_error(f"ERR unknown command '{cmd[0]}'")
+    
+def check_expired(key):
+    """If the key has a deadline and it's passed, delete it. Return True if it was expired."""
+    if key in expiries and time.time() > expiries[key]:
+        store.pop(key, None)
+        expiries.pop(key, None)
+        return True
+    return False
