@@ -1,12 +1,14 @@
 # PyRedis
 
-A Redis clone built from scratch in Python, using raw TCP sockets and the RESP protocol.
+A Redis clone built from scratch in Python. Implements the RESP protocol over raw TCP sockets, handles concurrent clients with asyncio, and persists data to disk using an append-only log.
 
-## What it does
+## Features
 
-- Accepts multiple simultaneous client connections using Python's asyncio event loop
-- Parses and responds to Redis commands using the RESP (Redis Serialization Protocol)
-- Stores key-value data in memory
+- Concurrent client connections via Python's asyncio event loop
+- RESP protocol parser and encoder written from scratch
+- In-memory key-value store
+- Key expiry with both lazy deletion and a background sweeper
+- Append-only file (AOF) persistence — write commands are logged to disk and replayed on startup
 
 ## Supported commands
 
@@ -14,12 +16,14 @@ A Redis clone built from scratch in Python, using raw TCP sockets and the RESP p
 |---------|---------|-------------|
 | PING | `PING` | Returns PONG |
 | SET | `SET name niharika` | Stores a value |
-| GET | `GET name` | Retrieves a value, or nil if missing |
-| DEL | `DEL name age` | Deletes one or more keys, returns count deleted |
-| EXISTS | `EXISTS name` | Returns 1 if key exists, 0 if not |
-| INCR | `INCR counter` | Increments a numeric value by 1 |
+| GET | `GET name` | Retrieves a value, or nil if the key is missing or expired |
+| DEL | `DEL key1 key2` | Deletes one or more keys, returns count removed |
+| EXISTS | `EXISTS name` | Returns 1 if the key exists, 0 if not |
+| INCR | `INCR counter` | Increments a numeric value by 1, starts from 0 if missing |
+| EXPIRE | `EXPIRE name 60` | Sets a TTL in seconds on a key |
+| TTL | `TTL name` | Returns seconds remaining, -1 if no expiry, -2 if key missing |
 
-## How to run
+## Getting started
 
 Start the server:
 ```
@@ -33,18 +37,21 @@ redis-cli
 
 ## Project structure
 
-- `server.py` — TCP server using asyncio, handles multiple clients concurrently
-- `commands.py` — command dispatcher and in-memory key-value store
-- `protocol.py` — RESP parser and encoders
-- `client.py` — simple test client for manual protocol testing
-- `test_protocol.py` — pytest suite for the RESP parser and encoders
-- `test_commands.py` — pytest suite for command handling
+```
+server.py          — asyncio TCP server, AOF logging
+commands.py        — command dispatcher, in-memory store, expiry logic
+protocol.py        — RESP parser and encoders
+persistence.py     — append-only file logging and replay
+client.py          — minimal test client for manual testing
+test_protocol.py   — tests for the RESP parser and encoders
+test_commands.py   — tests for command handling and expiry
+test_persistence.py — tests for AOF logging and replay
+```
 
 ## Running tests
 
 ```
-pytest test_protocol.py
-pytest test_commands.py
+pytest
 ```
 
 ---
