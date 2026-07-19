@@ -1,39 +1,23 @@
 import asyncio
 import time
 from protocol import parse_command
-from commands import handle_command
-from commands import store, expiries
-from commands import handle_command
+from commands import handle_command, store, expiries
 from persistence import log_command, load_commands, WRITE_COMMANDS
-
-async def handle_client(reader, writer):
-    addr = writer.get_extra_info("peername")
-    while True:
-        data = await reader.read(1024)
-        if not data:
-            break
-        command = parse_command(data)
-        reply = handle_command(command)
-        # log successful writes to disk
-        if command[0].upper() in WRITE_COMMANDS and not reply.startswith(b"-"):
-            log_command(command)
-        writer.write(reply)
-        await writer.drain()
-    writer.close()
 
 async def handle_client(reader, writer):
     addr = writer.get_extra_info("peername")
     print(f"Client connected: {addr}")
     while True:
-        #pauses here until bytes arrive
-        data = await reader.read(1024)      
+        data = await reader.read(1024)
         if not data:
             break
         command = parse_command(data)
         print(f"{addr} -> {command}")
-        writer.write(handle_command(command))
-        #pauses here until the reply is sent
-        await writer.drain()                
+        reply = handle_command(command)
+        if command[0].upper() in WRITE_COMMANDS and not reply.startswith(b"-"):
+            log_command(command)
+        writer.write(reply)
+        await writer.drain()
     writer.close()
     print(f"Client disconnected: {addr}")
 
