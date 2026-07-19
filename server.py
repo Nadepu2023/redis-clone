@@ -3,6 +3,23 @@ import time
 from protocol import parse_command
 from commands import handle_command
 from commands import store, expiries
+from commands import handle_command
+from persistence import log_command, load_commands, WRITE_COMMANDS
+
+async def handle_client(reader, writer):
+    addr = writer.get_extra_info("peername")
+    while True:
+        data = await reader.read(1024)
+        if not data:
+            break
+        command = parse_command(data)
+        reply = handle_command(command)
+        # log successful writes to disk
+        if command[0].upper() in WRITE_COMMANDS and not reply.startswith(b"-"):
+            log_command(command)
+        writer.write(reply)
+        await writer.drain()
+    writer.close()
 
 async def handle_client(reader, writer):
     addr = writer.get_extra_info("peername")
