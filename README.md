@@ -54,6 +54,3 @@ test_persistence.py — tests for AOF logging and replay
 pytest
 ```
 
----
-
-This is a work in progress.

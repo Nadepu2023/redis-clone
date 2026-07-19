@@ -1,10 +1,8 @@
 from protocol import encode_simple, encode_error, encode_int, encode_bulk
-import threading
 import time
 
 store = {}
-expiries = {} 
-store_lock = threading.Lock()
+expiries = {}
 
 def handle_command(cmd: list[str]) -> bytes:
     name = cmd[0].upper()
