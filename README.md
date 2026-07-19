@@ -10,6 +10,28 @@ A Redis clone built from scratch in Python. Implements the RESP protocol over ra
 - Key expiry with both lazy deletion and a background sweeper
 - Append-only file (AOF) persistence — write commands are logged to disk and replayed on startup
 
+## Design decisions
+
+**Concurrency: asyncio over threads.** I first implemented concurrent
+clients with one thread per connection, which required a lock around the
+store to prevent race conditions (two clients incrementing the same key
+could lose an update). I then rewrote it using an asyncio event loop —
+the same single-threaded model Redis itself uses. Because a coroutine
+can only yield at an `await`, and command execution contains none,
+each command runs atomically and the lock became unnecessary. This
+trades multi-core parallelism for a simpler, race-free design.
+
+**Key expiry: lazy + active deletion.** Expired keys are removed both
+when accessed (lazy) and by a background sweeper that runs once per
+second (active). Lazy deletion alone leaks memory on keys that are never
+read again; the sweeper bounds that. This mirrors how real Redis handles
+expiration.
+
+**Persistence: append-only file.** Every write command is logged to disk
+and replayed on startup to rebuild state. The tradeoff is durability vs.
+speed — flushing on every command is safest but slowest; buffering is
+faster but risks losing recent writes on a crash.
+
 ## Supported commands
 
 | Command | Example | Description |
