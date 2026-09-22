@@ -12,25 +12,11 @@ A Redis clone built from scratch in Python. Implements the RESP protocol over ra
 
 ## Design decisions
 
-**Concurrency: asyncio over threads.** I first implemented concurrent
-clients with one thread per connection, which required a lock around the
-store to prevent race conditions (two clients incrementing the same key
-could lose an update). I then rewrote it using an asyncio event loop —
-the same single-threaded model Redis itself uses. Because a coroutine
-can only yield at an `await`, and command execution contains none,
-each command runs atomically and the lock became unnecessary. This
-trades multi-core parallelism for a simpler, race-free design.
+Concurrency: asyncio instead of threads. I originally handled multiple clients by creating a separate thread for each connection. This worked, but I needed a lock around the data store to prevent race conditions. For example, if two clients tried to increment the same key at the same time, one of the updates could be lost. I later rewrote the server using an asyncio event loop. Since commands execute without yielding in the middle, they run one at a time and I no longer need the lock. The tradeoff is that commands don't run in parallel across multiple CPU cores, but the design is much simpler.
 
-**Key expiry: lazy + active deletion.** Expired keys are removed both
-when accessed (lazy) and by a background sweeper that runs once per
-second (active). Lazy deletion alone leaks memory on keys that are never
-read again; the sweeper bounds that. This mirrors how real Redis handles
-expiration.
+Key expiration: lazy + active deletion. I handle expired keys in two ways. First, if a client tries to access an expired key, it's deleted at that point. I also have a background task that checks for expired keys once per second. Without the background check, keys that are never accessed again could stay in memory indefinitely.
 
-**Persistence: append-only file.** Every write command is logged to disk
-and replayed on startup to rebuild state. The tradeoff is durability vs.
-speed — flushing on every command is safest but slowest; buffering is
-faster but risks losing recent writes on a crash.
+Persistence: append-only file. Whenever a client changes the database, the write command is saved to an append-only file. When the server starts again, it replays those commands to restore the previous data. There's a tradeoff between speed and durability here: writing everything to disk immediately is safer, while buffering writes is faster but could lose recent changes if the server crashes.
 
 ## Supported commands
 
